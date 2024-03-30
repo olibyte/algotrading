@@ -11,13 +11,16 @@ input ENUM_APPLIED_PRICE InpRSIAppliedPrice = PRICE_CLOSE; // Bollinger applied 
 input int InpRSIPeriod = 20;
 input bool InpShowLabel = false; //  show price of level
 input bool InpDrawSignals = true;
-input int InpKeltnerLookback = 10;
 
+input int InpUpperThreshold = 50; //upper threshold used for bullishDoubleTroubleRSI calc
+input int InpLowerThreshold = 50; //lower threshold used for bearishDoubleTroubleRSI calc
+input int InpRSIUpper = 50;
+input int InpRSILower = 50;
+//DERIVATIVES
+input int     InpBandsPeriod=20;       // Period
+input int     InpBandsShift=0;         // Shift
+input double  InpBandsDeviations=2.0;  // Deviation
 // Entry exit settings
-input int InpEntryGapPoints = 10; // Entry gap points, 50pts=0.5pips
-input int InpStopLossGapPoints = 10; // SL gap points, 50pts=0.5pips
-input int InpMaxPositionTime = 50;
-input int InpWaitTime = 50;
 // basic expert uses fixed order size
 input double InpOrderSize = 0.1; // order size in lots
 
@@ -33,3 +36,11 @@ input bool InpSaturday = true; // Saturday
 input group "Trading Hours (basic implementation, won't handle overnight cases or other periods. Also needs user input validation.)"
 input int InpStartHour = 0; //Start hour (24H)
 input int InpEndHour = 24; //Finish hour(24H)
+
+input group "Candlestick Patterns"
+input bool InpEuphoria; //euphoria indicator
+input bool InpDoubleTroubleWithRSIFilter; //double trouble with rsi filter
+input bool InpBarrier;
+input bool InpIndecision;
+input bool InpHammer;
+input bool InpInvertedHammer;

@@ -45,3 +45,4 @@ int WoY(datetime t) //Su=newWeek Week of Year = nWeek(t)-nWeeks(1.1.) CalOneWeek
    return(int((t-259200) / 604800) - int((t-172800 - DoY(t)*86400) / 604800) + 1); // calculation acc. to USA
   }
 
+

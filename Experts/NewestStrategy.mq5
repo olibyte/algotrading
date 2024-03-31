@@ -1,5 +1,10 @@
   #define app_name "Newest Strategy"
   #define app_magic 301124
+
+
+/*COMMENT OUT IF WE DON'T WANT TO LOAD INDICATORS FROM HIGHER TIME FRAMES WHILE IN VISUALIZER. IT KILLS.*/
+//  #define htf
+// #define debug
   input int InpMagic = app_magic; // Magic number
   input string InpTradeComment = app_name; // Trade comment
 
@@ -47,10 +52,12 @@
 
   // Function to calculate the first derivative of an array of doubles
 CTrade Trade; CPositionInfo PositionInfo; COrderInfo OrderInfo;
+
+#ifdef htf
 CIndicatorBollinger	Bollinger_H1;
 CIndicatorBollinger	Bollinger_H4;
 CIndicatorBollinger	Bollinger_D1;
-
+#endif
   color clr;
   // Indicator handles
   int HandleBollinger, HandleKeltner, HandleDerivative,HandleMacd;
@@ -65,15 +72,20 @@ CIndicatorBollinger	Bollinger_D1;
 
   double local_min = -0.0001; double local_max = 0.0001;
 
+#ifdef htf
   int HandleBollinger_H4;
   double ValuesBollingerUpper_H4[],ValuesBollingerMiddle_H4[],ValuesBollingerLower_H4[];
+#endif
   // Initialisation
   int OnInit() {
     string derivative = "Examples\\BB_1H.ex5";
     string keltner = "Keltner Channel.ex5";
+
+#ifdef htf
     Bollinger_H1.Init(Symbol(), PERIOD_H1, InpBollingerPeriod, 0, InpBollingerDeviations, InpBollingerAppliedPrice);
     Bollinger_H4.Init(Symbol(), PERIOD_H4, InpBollingerPeriod, 0, InpBollingerDeviations, InpBollingerAppliedPrice);
     Bollinger_D1.Init(Symbol(), PERIOD_D1, InpBollingerPeriod, 0, InpBollingerDeviations, InpBollingerAppliedPrice);
+#endif
     // HandleDerivative = iCustom(Symbol(), Period(),derivative,InpBandsPeriod,InpBandsShift,InpBandsDeviations);
     HandleKeltner = iCustom(Symbol(), Period(),keltner,InpEMAPeriod,InpATRPeriod,InpATRFactor,InpShowLabel);
     HandleMacd = iMACD(Symbol(), Period(),InpFastEMA,InpSlowEMA,InpSignalSMA,InpAppliedPrice);
@@ -121,28 +133,39 @@ CIndicatorBollinger	Bollinger_D1;
   }
   void OnTick() {
     if (!IsNewBar()) return; // still looking at same bar
+    #ifdef htf
     	if (!WaitForHTF(Symbol(), PERIOD_D1))	return;			//	Anchor data not available
 	//OHLC+BB of latest fully formed 4H CANDLE
-  double	BBM_H1_1	=	Bollinger_H1.GetValue(1);
+//  The buffer numbers are the following: 0 - BASE_LINE, 1 - UPPER_BAND, 2 - LOWER_BAND
+  double	BBM_H1_1	=	Bollinger_H1.GetValue(0,1); //buffer,index
+  double	BBH_H1_1	=	Bollinger_H1.GetValue(1,1); //buffer,index
+  double	BBL_H1_1	=	Bollinger_H1.GetValue(2,1); //buffer,index
 	double	Open_H1_1	=	iOpen(Symbol(), PERIOD_H1, 1);
   double	Close_H1_1	=	iClose(Symbol(), PERIOD_H1, 1);
   double	High_H1_1	=	iHigh(Symbol(), PERIOD_H1, 1);
   double	Low_H1_1	=	iLow(Symbol(), PERIOD_H1, 1);
 
-
 	//OHLC+BB of latest fully formed 4H CANDLE
-  double	BBM_H4_1	=	Bollinger_H4.GetValue(1);
+  double	BBM_H4_1	=	Bollinger_H4.GetValue(0,1);
+  double	BBH_H4_1	=	Bollinger_H4.GetValue(1,1); //buffer,index
+  double	BBL_H4_1	=	Bollinger_H4.GetValue(2,1); //buffer,index
 	double	Open_H4_1	=	iOpen(Symbol(), PERIOD_H4, 1);
   double	Close_H4_1	=	iClose(Symbol(), PERIOD_H4, 1);
   double	High_H4_1	=	iHigh(Symbol(), PERIOD_H4, 1);
   double	Low_H4_1	=	iLow(Symbol(), PERIOD_H4, 1);
 
 //OHLC+BB of latest fully formed DAILY CANDLE
-  double	BBM_D1_1	=	Bollinger_D1.GetValue(1);
+  double	BBM_D1_1	=	Bollinger_D1.GetValue(0,1);
+  double	BBH_D1_1	=	Bollinger_D1.GetValue(1,1); //buffer,index
+  double	BBL_D1_1	=	Bollinger_D1.GetValue(2,1); //buffer,index
   double	Open_D1_1	=	iOpen(Symbol(), PERIOD_D1, 1);
   double	Close_D1_1	=	iClose(Symbol(), PERIOD_D1, 1);
   double	High_D1_1	=	iHigh(Symbol(), PERIOD_D1, 1);
   double	Low_D1_1	=	iLow(Symbol(), PERIOD_D1, 1);
+  bool d1_midline_test,h4_midline_test,h1_midline_test;
+  bool d1_upper_test,h4_upper_test,h1_upper_test;
+  bool d1_lower_test,h4_lower_test,h1_lower_test;
+  
   string dir_D1_1;
   string dir_H4_1;
   string dir_H1_1;
@@ -161,6 +184,7 @@ CIndicatorBollinger	Bollinger_D1;
   } else {
     dir_H4_1 = "BEARISH";
   }
+  #endif
   // PrintFormat("Latest H4 Candle closed %s:\nO:     %f\nH:     %f\nL:     %f\nC:     %f\nBBMid: %f\n",dir_H4_1,Open_H4_1,High_H4_1,Low_H4_1,Close_H4_1,BBM_H4_1);
   // PrintFormat("Latest D1 Candle closed %s:\nO:     %f\nH:     %f\nL:     %f\nC:     %f\nBBMid: %f\n", dir_D1_1,Open_D1_1,High_D1_1,Low_D1_1,Close_D1_1,BBM_D1_1 );
   // PrintFormat("BBM_H4_1: %f\nClose_H4_1: %f",BBM_H4_1,Close_H4_1);
@@ -396,6 +420,7 @@ CIndicatorBollinger	Bollinger_D1;
             if (TakeProfit < predictedPR) { lots+= 0.02; Print("TP < predictedPR. Increasing lot size to ", lots);}
             if (TakeProfit < predictedLR) { lots+= 0.02; Print("TP < predictedLR. Increasing lot size to ", lots);}
             // TakeProfit += NormalizeDouble(TakeProfit*lots,Digits());
+            #ifdef htf
             PrintFormat("Latest H1 Candle closed %s:\nO:     %f\nH:     %f\nL:     %f\nC:     %f\nBBMid: %f\n",dir_H1_1,Open_H1_1,High_H1_1,Low_H1_1,Close_H1_1,BBM_H1_1);
             PrintFormat("Latest H4 Candle closed %s:\nO:     %f\nH:     %f\nL:     %f\nC:     %f\nBBMid: %f\n",dir_H4_1,Open_H4_1,High_H4_1,Low_H4_1,Close_H4_1,BBM_H4_1);
             PrintFormat("Latest D1 Candle closed %s:\nO:     %f\nH:     %f\nL:     %f\nC:     %f\nBBMid: %f\n", dir_D1_1,Open_D1_1,High_D1_1,Low_D1_1,Close_D1_1,BBM_D1_1);
@@ -421,6 +446,7 @@ CIndicatorBollinger	Bollinger_D1;
             Print("D1 BBLOW TEST:");
             Print("H4 BBLOW TEST:");
             Print("H1 BBLOW TEST:");
+            #endif
             Trade.BuyStop(lots,Price,Symbol(),StopLoss,TakeProfit,ORDER_TIME_SPECIFIED,expiration); 
             // }
         // }
@@ -486,6 +512,7 @@ CIndicatorBollinger	Bollinger_D1;
             if (TakeProfit > predictedPR) { lots+= 0.02; Print("TP > predictedPR. Increasing lot size to ", lots);}
             if (TakeProfit > predictedLR) { lots+= 0.02; Print("TP > predictedLR. Increasing lot size to ", lots);}
           // TakeProfit += NormalizeDouble(TakeProfit*lots,Digits());
+          #ifdef htf
             PrintFormat("Latest H1 Candle closed %s:\nO:     %f\nH:     %f\nL:     %f\nC:     %f\nBBMid: %f\n",dir_H1_1,Open_H1_1,High_H1_1,Low_H1_1,Close_H1_1,BBM_H1_1);
             PrintFormat("Latest H4 Candle closed %s:\nO:     %f\nH:     %f\nL:     %f\nC:     %f\nBBMid: %f\n",dir_H4_1,Open_H4_1,High_H4_1,Low_H4_1,Close_H4_1,BBM_H4_1);
             PrintFormat("Latest D1 Candle closed %s:\nO:     %f\nH:     %f\nL:     %f\nC:     %f\nBBMid: %f\n", dir_D1_1,Open_D1_1,High_D1_1,Low_D1_1,Close_D1_1,BBM_D1_1 );
@@ -510,6 +537,7 @@ CIndicatorBollinger	Bollinger_D1;
             Print("D1 BBUPPER TEST:");
             Print("H4 BBUPPER TEST:");
             Print("H1 BBUPPER TEST:");
+            #endif
           Trade.SellStop(lots, Price, Symbol(), StopLoss, TakeProfit, ORDER_TIME_SPECIFIED, expiration);
           // }
         }

@@ -42,7 +42,7 @@ input ENUM_APPLIED_PRICE   mAppliedPrice              = PRICE_CLOSE;    //MACD A
 
 input ulong InpWaitBars            = 5;    //Num of bars to wait before considering new trade
 //input int InpMaxHoldMins         = 150;
-input int InpMaxPositions        = 1;     //Max number of positions open at any given time.
+input int InpMaxPositions        = 1;     //Max positions.
 input ulong InpHoldBars            = 5;     //Maximum bars to hold a position
 input int InpStopLossGapPoints   = 100;  //Stop loss gap in points.
 input int InpEntryGapPoints = 50;      //flexibility when placing orders
@@ -65,8 +65,10 @@ CIndicatorMACD MACD_H1;
 bool fvbo_buy_flag,fvbo_sell_flag;
 datetime buy_signal_time, sell_signal_time;
 double rangeHigh,rangeLow;
-int rangeHighIndex, rangeLowIndex;
-int rsi_score, bb_score, macd_score = 0;
+double prevLow, prevHigh = 0;
+double hourlyLow, hourlyHigh,dailyLow,dailyHigh;
+int rangeHighIndex, rangeLowIndex, hourlyLowIndex, hourlyHighIndex,dailyLowIndex,dailyHighIndex,prev_fvbo_buy_index,fvbo_buy_index,fvbo_sell_index,prev_fvbo_sell_index;
+int rsi_score, bb_score, macd_score, highTestCount,lowTestCount = 0;
 int OnInit()
   {
    BB.Init(Symbol(), Period(), InpBBPeriod, 0, InpBBDeviations, InpBBAppliedPrice);
@@ -99,14 +101,14 @@ void OnTick()
    ulong minutes_since_deal = GetMinutesSinceDeal(last_deal_ticket); //mins since last deal
    ulong hold_mins = barsToMinutes(InpHoldBars);
    ulong wait_mins = barsToMinutes(InpWaitBars);
-   if(PositionsTotal() >= InpMaxPositions)
+   if(PositionsTotal() == InpMaxPositions)
      {
-      PrintFormat("Minutes since deal #%i: %i\nHold mins: %i",last_deal_ticket,minutes_since_deal,hold_mins);
-      if(minutes_since_deal >= hold_mins)
-        {
-         Print("Closing ticket...");
-         Trade.PositionClose(last_deal_ticket);
-        }
+      // PrintFormat("Minutes since deal #%i: %i\nHold mins: %i",last_deal_ticket,minutes_since_deal,hold_mins);
+      if (minutes_since_deal > hold_mins) {
+        PrintFormat("Held too long, closing position");
+        Trade.PositionClose(Symbol(),last_deal_ticket);
+      }
+        // closeExpiredPosition(last_deal_ticket,minutes_since_deal,hold_mins);
      }
    double ask = NormalizeDouble(SymbolInfoDouble(Symbol(), SYMBOL_ASK), Digits());
    double bid = NormalizeDouble(SymbolInfoDouble(Symbol(), SYMBOL_BID), Digits());
@@ -119,6 +121,21 @@ void OnTick()
    double high2 =  NormalizeDouble(iHigh(Symbol(),Period(),2),Digits());
    double low2 =   NormalizeDouble(iLow(Symbol(),Period(),2),Digits());
    double close2 = NormalizeDouble(iClose(Symbol(),Period(),2),Digits());
+//HIGHER HIGHS, LOWER LOWS
+   rangeHighIndex =           iHighest(Symbol(),Period(),MODE_CLOSE,24,2);
+   rangeLowIndex =            iLowest(Symbol(),Period(),MODE_CLOSE,24,2);
+   rangeHigh =                iClose(Symbol(),Period(),rangeHighIndex);
+   rangeLow =                 iClose(Symbol(),Period(),rangeLowIndex);
+   hourlyHighIndex =           iHighest(Symbol(),PERIOD_H1,MODE_CLOSE,24,0);
+   hourlyLowIndex =            iLowest(Symbol(),PERIOD_H1,MODE_CLOSE,24,0);
+   hourlyHigh =                iClose(Symbol(),PERIOD_H1,hourlyHighIndex);
+   hourlyLow =                 iClose(Symbol(),PERIOD_H1,hourlyLowIndex);
+   dailyHighIndex =           iHighest(Symbol(),PERIOD_H1,MODE_CLOSE,120,0);
+   dailyLowIndex =            iLowest(Symbol(),PERIOD_H1,MODE_CLOSE,120,0);
+   dailyHigh =                iClose(Symbol(),PERIOD_H1,dailyHighIndex);
+   dailyLow =                 iClose(Symbol(),PERIOD_H1,dailyLowIndex);
+  //  dailyHigh = MathMax(iHigh(Symbol(),PERIOD_D1,0),iHigh(Symbol(),PERIOD_D1,1));
+  // hourlyHigh = MathMax(iHigh(Symbol(),PERIOD_H1,0),iHigh(Symbol(),PERIOD_H1,1));
 
 //0 - BASE_LINE, 1 - UPPER_BAND, 2 - LOWER_BAND
    double BBM = NormalizeDouble(BB.GetValue(0,1), Digits());
@@ -136,23 +153,25 @@ void OnTick()
    double entry_gap =         PointsToDouble(InpEntryGapPoints);
    double rr = (high1-low1)*InpRR;
    double tp_target = (high1-low1)*InpTakeProfitTarget;
+   double candleRange = MathAbs(close1-open1);
+   double pointsTarget = PointsToDouble(8,Symbol());
    datetime expiration =      iTime(Symbol(), Period(), 0) + PeriodSeconds(Period());
    string expiration_string = TimeToString(expiration,TIME_DATE|TIME_MINUTES|TIME_SECONDS);
 
-   double current_high =      iHigh(Symbol(),Period(),1);
-   double current_low =       iLow(Symbol(),Period(),1);
-   //keep talloy of low below the lowest close
-   //keep talloy of high above the highest close
-   rangeHighIndex =           iHighest(Symbol(),Period(),MODE_CLOSE,48,3);
-   rangeLowIndex =            iLowest(Symbol(),Period(),MODE_CLOSE,48,3);
-   rangeHigh =                iClose(Symbol(),Period(),rangeHighIndex);
-   rangeLow =                 iClose(Symbol(),Period(),rangeLowIndex);
-   PrintFormat("RangeHigh: %.3f\nCurrentHigh: %.3f",rangeHigh,current_high);
-   double candleRange = MathAbs(close1-open1);
-   double pointsTarget = PointsToDouble(8,Symbol());
-   if(candleRange > pointsTarget) { PrintFormat("Good candle, candle range is: %f\n points target is %f ",candleRange, pointsTarget); }
+  // if (prevLow > 0 && prevHigh > 0) {
+  // //  ShowRangeLine( "prevHi", OBJ_HLINE, prevHigh, clrOrange,2);
+  // //  ShowRangeLine( "prevLo", OBJ_HLINE, prevLow, clrSkyBlue,2);
+  // }
+  //daily high and low
+  ShowRangeLine("dailyHigh",OBJ_HLINE,dailyHigh,clrRed,4);
+      ShowRangeLine("hourlyHigh",OBJ_HLINE,hourlyHigh,clrOrange,2);
 
-   ShowRange(rangeHigh,rangeLow,clrOrange,clrBlue);
+    ShowRangeLine("dailyLow",OBJ_HLINE,dailyLow,clrBlue,4);
+    ShowRangeLine("hourlyLow",OBJ_HLINE,hourlyLow,clrSkyBlue,2);
+    PrintFormat("dailyHigh: %.3f\nhourlyHigh: %.3f\ndailyLow: %.3f\nhourlyLow: %.3f\n",dailyHigh,hourlyHigh,dailyLow,hourlyLow);
+   //current high and low
+  //  ShowRange(rangeHigh,rangeLow,clrGreen,clrGreen,1);
+
 
 //BB DIRECTION FILTER
    double mx = InpMX; //significant slope value
@@ -196,7 +215,7 @@ void OnTick()
          bb_score = 0;
         }
 //RSI FILTER
-   if(RSI.GetValue(0) >= 50 && RSI.GetValue(0) <= 80)    //user input
+   if(RSI.GetValue(0) > 50 && RSI.GetValue(0) <= 80)    //user input
      {
       rsi_score = 1;
      }
@@ -275,23 +294,57 @@ void OnTick()
    int total_sell_score = bbu_score+rsi_score+macd_score+daily_close_score;
    int total_buy_score = bbl_score+rsi_score+macd_score+daily_close_score;
 ////////////////////FVBO SIGNALS////////////////
-#ifdef fvbo_core
    if(close2 < BB.GetValue(2,2) && close1 > open1 && !fvbo_buy_flag)
      {
       drawFVBO(1,clrPink);
       fvbo_buy_flag = true;
       fvbo_sell_flag = false;
+      prev_fvbo_buy_index = fvbo_buy_index;
+      fvbo_buy_index = 0;
+      PrintFormat("prev_fvbo_buy_index: %i\nfvbo_buy_index: %i",prev_fvbo_buy_index,fvbo_buy_index);
       buy_signal_time = TimeCurrent();
      }
+     fvbo_buy_index++;
+     prev_fvbo_buy_index++;
    if(close2 > BB.GetValue(1,2) && close1 < open1 && !fvbo_sell_flag)
      {
       drawFVBO(1,clrPink);
       fvbo_buy_flag = false;
       fvbo_sell_flag = true;
+      prev_fvbo_sell_index = fvbo_sell_index;
+      fvbo_sell_index = 0;
+     PrintFormat("prev_fvbo_sell_index: %i\nfvbo_sell_index: %i",prev_fvbo_sell_index,fvbo_sell_index);
       sell_signal_time = TimeCurrent();
      }
-   if (close2 < rangeLow) { PrintFormat("NEW RANGE LOW");}
-   if (close2 > rangeHigh) { PrintFormat("NEW RANGE HIGH");}
+     fvbo_sell_index++;
+     prev_fvbo_sell_index++;
+   if(close1 < hourlyLow)
+     {
+      // PrintFormat("NEW RANGE LOW (LOWEST CLOSE)");
+      prevLow = rangeLow;
+      drawNewLow(1,clrBlue);
+      lowTestCount = 0;
+     }
+   if(close1 > hourlyHigh)
+     {
+      // PrintFormat("NEW RANGE HIGH (HIGHEST CLOSE)");
+      prevHigh = rangeHigh;
+      drawNewHigh(1,clrRed);
+      highTestCount = 0;
+     }
+
+   if(high1 > hourlyHigh && close1 < hourlyHigh)
+     {
+      PrintFormat("HIGH TESTED");
+      highTestCount++;
+      drawHighTest(1,clrRed,highTestCount);
+     }
+   if(low1 < hourlyLow && close1 > hourlyLow)
+     {
+      PrintFormat("LOW TESTED");
+      lowTestCount++;
+      drawLowTest(1,clrBlue,lowTestCount);
+     }
 ///////////////////FVBO TRADE MANAGEMENT/////////////////////
    if(fvbo_buy_flag)
      {
@@ -307,8 +360,8 @@ void OnTick()
       double sl =    NormalizeDouble(low1-sl_gap,   Digits());
       double price = high1;
       double tp =    price + tp_target;
-      PrintFormat("Assessing BUY bias...total_score: %i\nmacd_score: %i\nbb_score: %i\nrsi_score: %i\ndaily_close_score: %i", total_score,macd_score,bb_score,rsi_score,daily_close_score);
-      PrintFormat("and BBL score: %i",bbl_score);
+      // PrintFormat("Assessing BUY bias...total_score: %i\nmacd_score: %i\nbb_score: %i\nrsi_score: %i\ndaily_close_score: %i", total_score,macd_score,bb_score,rsi_score,daily_close_score);
+      // PrintFormat("and BBL score: %i",bbl_score);
 
 #ifdef use_htf
       PrintFormat("and Hourly score: %i",hourly_score);
@@ -316,6 +369,13 @@ void OnTick()
       //RiskReward must be below midline and score must be positive
       if(price+rr < BBM && candleRange > pointsTarget)
         {
+         if(PositionsTotal() == 1)
+           {
+            fvbo_buy_flag = false;
+            return;
+           }
+          //  if (lowTestCount < 2) return; //don't place a trade if we haven't found support
+           if (prev_fvbo_buy_index > 20) return;
          Trade.BuyStop(lots,price,Symbol(),sl,tp,ORDER_TIME_SPECIFIED,expiration);
         }
      }
@@ -332,18 +392,25 @@ void OnTick()
       double sl         = NormalizeDouble(high1+sl_gap,Digits());
       double price      = low1;
       double tp         = price - tp_target;
-      PrintFormat("Assessing SELL bias...total_score: %i\nmacd_score: %i\nbb_score: %i\nrsi_score: %i\ndaily_close_score: %i", total_score,macd_score,bb_score,rsi_score,daily_close_score);         //RiskReward must be above midline && score must be negative
-      PrintFormat("and BBU score: %i",bbu_score);
+      // PrintFormat("Assessing SELL bias...total_score: %i\nmacd_score: %i\nbb_score: %i\nrsi_score: %i\ndaily_close_score: %i", total_score,macd_score,bb_score,rsi_score,daily_close_score);         //RiskReward must be above midline && score must be negative
+      // PrintFormat("and BBU score: %i",bbu_score);
 
 #ifdef use_htf
       PrintFormat("and Hourly score: %i",hourly_score);
 #endif
       if(price-rr > BBM && candleRange > pointsTarget)
         {
+         if(PositionsTotal() == 1)
+           {
+            fvbo_sell_flag = false;
+            return;
+           }
+        //  if(highTestCount < 2) return; //don't place a trade if we haven't found resistance
+        if (prev_fvbo_sell_index > 20) return;
          Trade.SellStop(lots,price,Symbol(),sl,tp,ORDER_TIME_SPECIFIED,expiration);
         }
      }
-#endif
+
   }
 
 
@@ -376,6 +443,70 @@ void drawFVBO(int i, color c)
    ObjectSetString(0,"Setup" + setupTime,OBJPROP_TEXT,"FVBO");
    ObjectSetInteger(0, "Setup" + setupTime, OBJPROP_COLOR, c);
    ObjectSetDouble(0,"Setup" + setupTime,OBJPROP_ANGLE,90.0);
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void drawLowTest(int i, color c, int count)
+  {
+   datetime setupTime = iTime(Symbol(), Period(), i);
+   ObjectCreate(0, "TestL" + setupTime, OBJ_TEXT, 0, setupTime, iLow(Symbol(),Period(),i));
+   ObjectSetString(0,"TestL" + setupTime,OBJPROP_TEXT,"t"+count);
+   ObjectSetInteger(0, "TestL" + setupTime, OBJPROP_COLOR, c);
+   ObjectSetDouble(0,"TestL" + setupTime,OBJPROP_ANGLE,0.0);
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void drawHighTest(int i, color c,int count)
+  {
+   datetime setupTime = iTime(Symbol(), Period(), i);
+   ObjectCreate(0, "TestH" + setupTime, OBJ_TEXT, 0, setupTime, iLow(Symbol(),Period(),i));
+   ObjectSetString(0,"TestH" + setupTime,OBJPROP_TEXT,"t"+count);
+   ObjectSetInteger(0, "TestH" + setupTime, OBJPROP_COLOR, c);
+   ObjectSetDouble(0,"TestH" + setupTime,OBJPROP_ANGLE,0.0);
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void drawNewLow(int i, color c)
+  {
+   datetime setupTime = iTime(Symbol(), Period(), i);
+   ObjectCreate(0, "SetupL" + setupTime, OBJ_TEXT, 0, setupTime, iLow(Symbol(),Period(),i));
+   ObjectSetString(0,"SetupL" + setupTime,OBJPROP_TEXT,"L");
+   ObjectSetInteger(0, "SetupL" + setupTime, OBJPROP_COLOR, c);
+    ObjectSetInteger(0,"SetupH" + setupTime,OBJPROP_WIDTH,2);
+   ObjectSetDouble(0,"SetupL" + setupTime,OBJPROP_ANGLE,0.0);
+  }
+  void drawPrevLow(int i, color c)
+  {
+   datetime setupTime = iTime(Symbol(), Period(), i);
+   ObjectCreate(0, "PrevL" + setupTime, OBJ_TEXT, 0, setupTime, iLow(Symbol(),Period(),i));
+   ObjectSetString(0,"PrevL" + setupTime,OBJPROP_TEXT,"L");
+   ObjectSetInteger(0, "PrevL" + setupTime, OBJPROP_COLOR, c);
+    ObjectSetInteger(0,"Prev" + setupTime,OBJPROP_WIDTH,2);
+   ObjectSetDouble(0,"PrevL" + setupTime,OBJPROP_ANGLE,0.0);
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void drawNewHigh(int i, color c)
+  {
+   datetime setupTime = iTime(Symbol(), Period(), i);
+   ObjectCreate(0, "SetupH" + setupTime, OBJ_TEXT, 0, setupTime, iLow(Symbol(),Period(),i));
+   ObjectSetString(0,"SetupH" + setupTime,OBJPROP_TEXT,"H");
+   ObjectSetInteger(0, "SetupH" + setupTime, OBJPROP_COLOR, c);
+   ObjectSetInteger(0,"SetupH" + setupTime,OBJPROP_WIDTH,2);
+   ObjectSetDouble(0,"SetupH" + setupTime,OBJPROP_ANGLE,0.0);
+  }
+  void drawPrevHigh(int i, color c)
+  {
+   datetime setupTime = iTime(Symbol(), Period(), i);
+   ObjectCreate(0, "PrevH" + setupTime, OBJ_TEXT, 0, setupTime, iLow(Symbol(),Period(),i));
+   ObjectSetString(0,"PrevH" + setupTime,OBJPROP_TEXT,"H");
+   ObjectSetInteger(0, "PrevH" + setupTime, OBJPROP_COLOR, c);
+   ObjectSetInteger(0,"PrevH" + setupTime,OBJPROP_WIDTH,2);
+   ObjectSetDouble(0,"PrevH" + setupTime,OBJPROP_ANGLE,0.0);
   }
 
 //+------------------------------------------------------------------+

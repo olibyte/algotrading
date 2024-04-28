@@ -30,20 +30,20 @@ double PipSize( string symbol ) {
 double PipsToDouble( double pips ) { return ( pips * PipSize( Symbol() ) ); }
 double PipsToDouble( double pips, string symbol ) { return ( pips * PipSize( symbol ) ); }
 
-void ShowRange( double hi, double lo, color hiclr, color loclr ) {
+void ShowRange( double hi, double lo, color hiclr, color loclr, int width ) {
 
-   ShowRangeLine( "hi", OBJ_HLINE, hi, hiclr);
-   ShowRangeLine( "lo", OBJ_HLINE, lo, loclr);
+   ShowRangeLine( "hi", OBJ_HLINE, hi, hiclr,width);
+   ShowRangeLine( "lo", OBJ_HLINE, lo, loclr,width);
   //  ShowRangeLine( "now", OBJ_VLINE, lo );
 }
 
-void ShowRangeLine( string name, ENUM_OBJECT type, double value, color rangeclr ) {
+void ShowRangeLine( string name, ENUM_OBJECT type, double value, color rangeclr, int width ) {
 
    ObjectDelete( 0, name );
    ObjectCreate( 0, name, type, 0, iTime( Symbol(), Period(), 1 ), value );
    ObjectSetInteger( 0, name, OBJPROP_COLOR, rangeclr );
    ObjectSetInteger( 0, name, OBJPROP_STYLE, STYLE_DASH );
-   ObjectSetInteger(0,name,OBJPROP_WIDTH,2);
+   ObjectSetInteger(0,name,OBJPROP_WIDTH,width);
 }
  bool WaitForHTF(string symbol, ENUM_TIMEFRAMES timeframe) {
     for (int waitCount = 9; waitCount >= 0; waitCount--) {

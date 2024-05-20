@@ -15,11 +15,50 @@
 
 #include <Trade/Trade.mqh>
 #include <Indicators/IndicatorBollinger.mqh>
-#include <Indicators/IndicatorCSR.mqh>
+// #include <Indicators/IndicatorCSR.mqh>
 #include <Indicators/IndicatorMACD.mqh>
 #include <Indicators/IndicatorRSI.mqh>
 #include <Utils.mqh>
+#include <CandlestickPatterns.mqh>
+#include <FVBO.mqh>
+// ,external_use,max_bars,htf,aoi_lower_level,aoi_higher_level,breakout_add_pips,enable_alert,enable_email,enable_mobile,zz_InpDepth_ltf,zz_InpDeviation_ltf,zz_InpBackstep_ltf,zz_InpDepth_htf,zz_InpDeviation_htf,zz_InpBackstep_htf,InpPeriod,InpCoeff,InpCoeffV,InpPeriodSm,enable_zz_htf,zz_htf_clr_buy,zz_htf_clr_sell,enable_zz_ltf,zz_ltf_clr_buy,zz_ltf_clr_sell,enable_zz_br,zz_br_clr_buy,zz_br_clr_sell,enable_aoi,zz_aoi_clr_buy,zz_aoi_clr_sell,enable_diver,zz_div_clr_buy,zz_div_clr_sell,zz_div_width,
 
+
+input bool external_use=false;
+input int max_bars=1000;
+input int htf=16388;
+input double aoi_lower_level=38.6;
+input double aoi_higher_level=79;
+input int breakout_add_pips=10;
+input bool enable_alert=true;
+input bool enable_email=false;
+input bool enable_mobile=false;
+input int zz_InpDepth_ltf=12;
+input int zz_InpDeviation_ltf=5;
+input int zz_InpBackstep_ltf=3;
+input int zz_InpDepth_htf=12;
+input int zz_InpDeviation_htf=5;
+input int zz_InpBackstep_htf=3;
+input int InpPeriod=130; //VFO
+input double InpCoeff=0.2; //VFO
+input double InpCoeffV=2.5; //VFO
+input int InpPeriodSm=3; //VFO
+input bool enable_zz_htf=true;
+input int zz_htf_clr_buy=10156544; //MEDIUMSPRINGGREEN, THICK ZZ
+input int zz_htf_clr_sell=17919; //ORANGERED, THICK ZZ
+input bool enable_zz_ltf=true;
+input int zz_ltf_clr_buy=8421376; //TEAL
+input int zz_ltf_clr_sell=16748574; //DODGERBLUE
+input bool enable_zz_br=true;
+input int zz_br_clr_buy=2237106; //special dark red line FIREBRICK
+input int zz_br_clr_sell=15631086; //special purple line VIOLET
+input bool enable_aoi=true;
+input int zz_aoi_clr_buy=16776960; //AQUA
+input int zz_aoi_clr_sell=14772545; //ROYALBLUE
+input bool enable_diver=true;
+input int zz_div_clr_buy=16777215; //WHITE
+input int zz_div_clr_sell=16777215; //WHITE
+input int zz_div_width=2;
 
 //BB user input
 input bool InpRSI_filter = true;
@@ -58,27 +97,36 @@ COrderInfo OrderInfo;
 CIndicatorBollinger BB;
 CIndicatorRSI RSI;
 CIndicatorMACD MACD;
-CIndicatorBollinger BB_H1;
-CIndicatorRSI RSI_H1;
-CIndicatorMACD MACD_H1;
 //FVBO
 bool fvbo_buy_flag,fvbo_sell_flag;
 datetime buy_signal_time, sell_signal_time;
 double rangeHigh,rangeLow;
 double prevLow, prevHigh = 0;
 double hourlyLow, hourlyHigh,dailyLow,dailyHigh;
-int rangeHighIndex, rangeLowIndex, hourlyLowIndex, hourlyHighIndex,dailyLowIndex,dailyHighIndex,prev_fvbo_buy_index,fvbo_buy_index,fvbo_sell_index,prev_fvbo_sell_index;
+int rangeHighIndex, rangeLowIndex, hourlyLowIndex, hourlyHighIndex,dailyLowIndex,dailyHighIndex,prev_fvbo_buy_index,fvbo_buy_index,fvbo_sell_index,prev_fvbo_sell_index, barsSinceLastLow, barsSinceLastHigh;
 int rsi_score, bb_score, macd_score, highTestCount,lowTestCount = 0;
+bool found_target = false;
+bool canShort = true;
+bool canLong = true;
+double blue_bottom, aqua_top, blue_border, aqua_border;
+
+//ICT
+// _AOI_SELL:14772545
+// _AOI_BUY: 16776960
+
+int filter_total, purple_total, dark_red_total,signal_total, buy_aoi_total,sell_aoi_total = 0;
+datetime last_purple_signal, last_dark_red_signal, last_buy_aoi, last_sell_aoi;
 int OnInit()
   {
+    // string indicator_name = "Step_2_ICT_Breakout_Indicator.ex5";
+  //  HandleICT = iCustom(Symbol(), Period(),"Step_2_ICT_Breakout_Indicator.ex5",external_use,max_bars,htf,aoi_lower_level,aoi_higher_level,breakout_add_pips,enable_alert,enable_email,enable_mobile,zz_InpDepth_ltf,zz_InpDeviation_ltf,zz_InpBackstep_ltf,zz_InpDepth_htf,zz_InpDeviation_htf,zz_InpBackstep_htf,InpPeriod,InpCoeff,InpCoeffV,InpPeriodSm,enable_zz_htf,zz_htf_clr_buy,zz_htf_clr_sell,enable_zz_ltf,zz_ltf_clr_buy,zz_ltf_clr_sell,enable_zz_br,zz_br_clr_buy,zz_br_clr_sell,enable_aoi,zz_aoi_clr_buy,zz_aoi_clr_sell,enable_diver,zz_div_clr_buy,zz_div_clr_sell,zz_div_width);   
+  //  ArraySetAsSeries(ValuesICT,true);
+
+
    BB.Init(Symbol(), Period(), InpBBPeriod, 0, InpBBDeviations, InpBBAppliedPrice);
    MACD.Init(Symbol(),Period(),8,21,5,PRICE_CLOSE);
    RSI.Init(Symbol(),Period(),5,PRICE_CLOSE);
-#ifdef use_htf
-   BB_H1.Init(Symbol(), PERIOD_H1, InpBBPeriod, 0, InpBBDeviations, InpBBAppliedPrice);
-   MACD_H1.Init(Symbol(),PERIOD_H1,8,21,5,PRICE_CLOSE);
-   RSI_H1.Init(Symbol(),PERIOD_H1,5,PRICE_CLOSE);
-#endif
+
    return(INIT_SUCCEEDED);
   }
 //+------------------------------------------------------------------+
@@ -91,27 +139,13 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
+
 void OnTick()
   {
-   if(!IsNewBar())
-      return;                              // still looking at same bar
-   if(!WaitForHTF(Symbol(), PERIOD_D1))
-      return;   // Anchor data not available
-   ulong last_deal_ticket = GetLastDealTicket();                  //last deal ticket
-   ulong minutes_since_deal = GetMinutesSinceDeal(last_deal_ticket); //mins since last deal
-   ulong hold_mins = barsToMinutes(InpHoldBars);
-   ulong wait_mins = barsToMinutes(InpWaitBars);
-   if(PositionsTotal() == InpMaxPositions)
-     {
-      // PrintFormat("Minutes since deal #%i: %i\nHold mins: %i",last_deal_ticket,minutes_since_deal,hold_mins);
-      if (minutes_since_deal > hold_mins) {
-        PrintFormat("Held too long, closing position");
-        Trade.PositionClose(Symbol(),last_deal_ticket);
-      }
-        // closeExpiredPosition(last_deal_ticket,minutes_since_deal,hold_mins);
-     }
-   double ask = NormalizeDouble(SymbolInfoDouble(Symbol(), SYMBOL_ASK), Digits());
-   double bid = NormalizeDouble(SymbolInfoDouble(Symbol(), SYMBOL_BID), Digits());
+   if(!IsNewBar()) return;                     // still looking at same bar
+   if(!WaitForHTF(Symbol(), PERIOD_D1)) return;   // Anchor data not available
+   double ask = NormalizeDouble(SymbolInfoDouble(Symbol(), SYMBOL_ASK), Digits()); //long
+   double bid = NormalizeDouble(SymbolInfoDouble(Symbol(), SYMBOL_BID), Digits()); //short
 //OHLC for latest 2 fully formed bars
    double open1 =  NormalizeDouble(iOpen(Symbol(),Period(),1),Digits());
    double high1 =  NormalizeDouble(iHigh(Symbol(),Period(),1),Digits());
@@ -122,16 +156,16 @@ void OnTick()
    double low2 =   NormalizeDouble(iLow(Symbol(),Period(),2),Digits());
    double close2 = NormalizeDouble(iClose(Symbol(),Period(),2),Digits());
 //HIGHER HIGHS, LOWER LOWS
-   rangeHighIndex =           iHighest(Symbol(),Period(),MODE_CLOSE,24,2);
-   rangeLowIndex =            iLowest(Symbol(),Period(),MODE_CLOSE,24,2);
+   rangeHighIndex =           iHighest(Symbol(),Period(),MODE_CLOSE,7,2);
+   rangeLowIndex =            iLowest(Symbol(),Period(),MODE_CLOSE,7,2);
    rangeHigh =                iClose(Symbol(),Period(),rangeHighIndex);
    rangeLow =                 iClose(Symbol(),Period(),rangeLowIndex);
-   hourlyHighIndex =           iHighest(Symbol(),PERIOD_H1,MODE_CLOSE,24,0);
-   hourlyLowIndex =            iLowest(Symbol(),PERIOD_H1,MODE_CLOSE,24,0);
+   hourlyHighIndex =           iHighest(Symbol(),PERIOD_H1,MODE_CLOSE,50,0);
+   hourlyLowIndex =            iLowest(Symbol(),PERIOD_H1,MODE_CLOSE,50,0);
    hourlyHigh =                iClose(Symbol(),PERIOD_H1,hourlyHighIndex);
    hourlyLow =                 iClose(Symbol(),PERIOD_H1,hourlyLowIndex);
-   dailyHighIndex =           iHighest(Symbol(),PERIOD_H1,MODE_CLOSE,120,0);
-   dailyLowIndex =            iLowest(Symbol(),PERIOD_H1,MODE_CLOSE,120,0);
+   dailyHighIndex =           iHighest(Symbol(),PERIOD_H1,MODE_CLOSE,150,0);
+   dailyLowIndex =            iLowest(Symbol(),PERIOD_H1,MODE_CLOSE,150,0);
    dailyHigh =                iClose(Symbol(),PERIOD_H1,dailyHighIndex);
    dailyLow =                 iClose(Symbol(),PERIOD_H1,dailyLowIndex);
   //  dailyHigh = MathMax(iHigh(Symbol(),PERIOD_D1,0),iHigh(Symbol(),PERIOD_D1,1));
@@ -142,11 +176,6 @@ void OnTick()
    double BBU = NormalizeDouble(BB.GetValue(1,1), Digits());
    double BBL = NormalizeDouble(BB.GetValue(2,1), Digits());
 
-#ifdef use_htf
-   double BBM_H1 = NormalizeDouble(BB_H1.GetValue(0,1), Digits());
-   double BBU_H1 = NormalizeDouble(BB_H1.GetValue(1,1), Digits());
-   double BBL_H1 = NormalizeDouble(BB_H1.GetValue(2,1), Digits());
-#endif
    double tp =                BBM;
    double lots =              InpLotSize;
    double sl_gap =            PointsToDouble(InpStopLossGapPoints);
@@ -157,146 +186,205 @@ void OnTick()
    double pointsTarget = PointsToDouble(8,Symbol());
    datetime expiration =      iTime(Symbol(), Period(), 0) + PeriodSeconds(Period());
    string expiration_string = TimeToString(expiration,TIME_DATE|TIME_MINUTES|TIME_SECONDS);
+   //FIND ICT OBJECTS
+      int object1_count = ObjectsTotal(0);
+      int filter_count = ObjectsTotal(0,1);
+      int purple_count = 0;
+      int dark_red_count = 0;
+      int buy_aoi_count = 0;
+      int sell_aoi_count = 0;
+     for (int i = 0; i < object1_count; i++) {
+      string object_name = ObjectName(0,i,0);
 
-  // if (prevLow > 0 && prevHigh > 0) {
-  // //  ShowRangeLine( "prevHi", OBJ_HLINE, prevHigh, clrOrange,2);
-  // //  ShowRangeLine( "prevLo", OBJ_HLINE, prevLow, clrSkyBlue,2);
-  // }
-  //daily high and low
-  ShowRangeLine("dailyHigh",OBJ_HLINE,dailyHigh,clrRed,4);
-      ShowRangeLine("hourlyHigh",OBJ_HLINE,hourlyHigh,clrOrange,2);
+      //filter out autrade objects:
+      string filter_string = "autotrade #";
+      if (StringFind(object_name,filter_string,0) > -1) {
+        ObjectDelete(0,object_name);
+      }
+      //identify ICT objects
+      string matched_string1 = "_L"; //line start
+      string matched_string2 = "_AOI";
+      string matched_string3 = "_R"; //line end
+      string matched_string4 = "_B";
+      string matched_string5 = "_C";
+      string matched_string6 = "_V";
+      int object_color;
+      double object_price;
+      string object_end_time;
+      datetime object_time;
+      datetime object_end_datetime;
+      if ((StringFind(object_name,matched_string1,0) > -1) || (StringFind(object_name,matched_string2,0) > -1) || (StringFind(object_name,matched_string3,0) > -1) || (StringFind(object_name,matched_string4,0) > -1) || (StringFind(object_name,matched_string5,0) > -1) || (StringFind(object_name,matched_string6,0) > -1)) {
+        object_color = ObjectGetInteger(0,object_name,OBJPROP_COLOR);
+        object_price = ObjectGetDouble(0,object_name,OBJPROP_PRICE,0);
+        object_time = (datetime)ObjectGetInteger(0,object_name,OBJPROP_TIME);
+                
+        // if (StringFind(object_name,matched_string6) > -1) {
+        //     Print("_V color: "+object_color);
+        //     Print(object_price);
+        // }
+        //     if (StringFind(object_name,matched_string1) > -1) {
+        //     Print("_R color: "+object_color);
+        //     Print(object_price);
+        // }
+        // PURPLE ZIGZAG;
+        if (object_color == 15631086 && StringFind(object_name,matched_string3) > -1)
+          {
+         Print("Purple end:   "+object_time+" "+object_price);
+         purple_count++;
+      };
+      //DARK RED ZIGZAG
+       if (object_color == 2237106 && StringFind(object_name,matched_string3) > -1) {
+        Print("Dark red end: "+object_time+" "+object_price);
+        dark_red_count++;
+      };
 
-    ShowRangeLine("dailyLow",OBJ_HLINE,dailyLow,clrBlue,4);
-    ShowRangeLine("hourlyLow",OBJ_HLINE,hourlyLow,clrSkyBlue,2);
-    PrintFormat("dailyHigh: %.3f\nhourlyHigh: %.3f\ndailyLow: %.3f\nhourlyLow: %.3f\n",dailyHigh,hourlyHigh,dailyLow,hourlyLow);
-   //current high and low
-  //  ShowRange(rangeHigh,rangeLow,clrGreen,clrGreen,1);
+      //DARK BLUE BOX
+      if (object_color == 14772545 && StringFind(object_name,matched_string2) > -1) {
+        Print("SELL_AOI end: "+object_time+" "+object_price);
+        sell_aoi_count++;
+        blue_bottom = ObjectGetDouble(0,object_name,OBJPROP_PRICE,0); //bottom of the blue box       
+      };
+      //DARK BLUE BORDER BOTTOM represents a low point based on zigzag indicator?
+      if (object_color == 14772545 && StringFind(object_name,matched_string4) > -1) {
+        Print("ZZ_LOW end: "+object_time+" "+object_price);
+        blue_border = ObjectGetDouble(0,object_name,OBJPROP_PRICE,0); //bottom of the blue border
+      };
+      //AQUA BOX
+      if (object_color == 16776960 && StringFind(object_name,matched_string2) > -1) {
+        Print("BUY_AOI end:  "+object_time+" "+object_price);
+        buy_aoi_count++;
+        aqua_top = ObjectGetDouble(0,object_name,OBJPROP_PRICE,0);  //top of the aqua box
+      };
+      //AQUA BORDER TOP represents a high point based on zig zag indicator
+      if (object_color == 16776960 && StringFind(object_name,matched_string4) > -1) {
+        Print("ZZ_BUY_B end:  "+object_time+" "+object_price);
+        aqua_border = ObjectGetDouble(0,object_name,OBJPROP_PRICE,0);  //top of the aqua border
+      };
+      //zz_htf_clr_buy=10156544; 
+      //zz_htf_clr_sell=17919;
+    
+    };
+   };
+  Print("dark_red_count:"+dark_red_count);
+  Print("filter_count:"+filter_count);
+  Print("purple_count:"+purple_count);
+  Print("Signal total:"+signal_total);
+  Print("buy_aoi_total:"+buy_aoi_total);
+  Print("sell_aoi_total:"+sell_aoi_total);
+    if (buy_aoi_total != buy_aoi_count) {
+      Print("buy_aoi added. buy_aoi_total was "+buy_aoi_total+" and is now "+buy_aoi_count);
+      buy_aoi_total = buy_aoi_count;
+      last_buy_aoi = TimeCurrent();
+  };
+    if (sell_aoi_total != sell_aoi_count) {
+      Print("sell_aoi added. sell_aoi_total was "+sell_aoi_total+" and is now "+sell_aoi_count);
+      sell_aoi_total = sell_aoi_count;
+      last_sell_aoi = TimeCurrent();
+  };
+    if (purple_total != purple_count) {
+    Print("Purple added. Purple total was "+purple_total+" and is now "+purple_count);
+    purple_total = purple_count;
+    //SELL BREAKOUT SIGNAL - just left a dark blue box
+    if (filter_total == filter_count) { 
+      signal_total++;
+      // canShort = true; canLong = false;
+      last_purple_signal = TimeCurrent();
+      };
+  };
+      if (dark_red_total != dark_red_count) {
+    Print("Dark red added. Dark red total was "+dark_red_total+" and is now "+dark_red_count);
+    dark_red_total = dark_red_count;
+    //BUY BREAKOUT SIGNAL - just left an aqua box
+    if (filter_total == filter_count) { 
+      signal_total++;
+      canShort = false; canLong = true;
+      last_dark_red_signal = TimeCurrent();
+      }
+  };
+  //FILTER SIGNALS
+  if (filter_total != filter_count) {
+    Print("Signal filtered. Filter total was "+filter_total+" and is now "+filter_count);
+    filter_total = filter_count;
+  };
+  if (signal_total == 0) {
+    canShort = true; canLong = true;
+  }
+
+  Print("Last purple signal:   "+last_purple_signal);
+  Print("Last dark red signal: "+last_dark_red_signal);
+  Print("Last buy_aoi signal:  "+last_buy_aoi);
+  Print("Last sell_aoi signal: "+last_sell_aoi);
+  Print("canShort: "+canShort+"canLong: "+canLong);
+  Print("blue_aoi_bottom: "+blue_bottom);
+  Print("blue_border_bottom: "+blue_border);
+  Print("aqua_aoi_top:    "+aqua_top);
+  Print("aqua_border_top: "+aqua_border);
+  canLong = true; canShort = true;
+  if (last_buy_aoi > last_sell_aoi) {
+    Print("BULLISH");
+    canLong = true; canShort = false;
+  } else {
+    Print("BEARISH");
+    canLong = false; canShort = true;
+  }
+  Print("canLong: "+canLong+" canShort: "+canShort);
+  // int blue_border_top_index = iHighest(Symbol(),Period(),MODE_HIGH,1000,2);
+  // double blue_border_top = iClose(Symbol(),Period(),blue_border_top_index);
+  // Print("blue_border_top? "+blue_border_top);
+
+  //82.175 = low = blue border bottom
+  //83.063572 = //blue bottom
+  
+  //REVERSE ENGINEERING FOR A 38.2 FIB LEVEL
+  //FIB_LEVEL = 38.2
+  //83.063572−82.175=0.382×(High Point−82.175)
+  //0.888572=0.382×(High Point−82.175)
+  //High Point-82.175= (0.888572/0.382 )
+  //High Point=82.175+ (0.888572/0.382 )
+  //High Point=82.175+2.326
+  //  High Point=84.501 //OUR BLUE BORDER TOP LEVEL
+
+  //REVERSE ENGINEERING FOR A 79.0 FIB LEVEL
+  //FIB_LEVEL = 79
+  //83.063572−82.175=0.79×(High Point−82.175)
+  //0.888572=0.79×(High Point−82.175)
+//  82.175 = 0.79
+  //High Point-82.175= (0.888572/0.382 )
+  //High Point=82.175+ (0.888572/0.382 )
+  //High Point=82.175+2.326
+  //  High Point=84.501 //OUR BLUE BORDER TOP LEVEL
 
 
-//BB DIRECTION FILTER
-   double mx = InpMX; //significant slope value
-   int BBMdirection = getBBDirection(BB,0,0,3,mx);
-   int BBUdirection = getBBDirection(BB,1,0,3,mx);
-   int BBLdirection = getBBDirection(BB,2,0,3,mx);
-//assign BB, MACD, RSI scores for current timeframe.
-   int bbu_score = 0;
-   int bbl_score = 0;
-   if(BBUdirection > mx)    //upper band sloping upwards
-     {
-      bbu_score = 1;
-     }
-   else
-      if(BBUdirection < -1*mx)    //upper band sloping down
-        {
-         bbu_score = -1;
-        }
-   if(BBLdirection > mx)    //lower band sloping upwards
-     {
-      bbl_score = 1;
-     }
-   else
-      if(BBLdirection < -1*mx)    //lower band sloping downwards
-        {
-         bbl_score = -1;
-        }
 
-//STRICTER BB DIRECTION CONDITIONS
-   if(BBUdirection > mx && BBLdirection > mx)    //BOTH BB in same direction
-     {
-      bb_score = 1;
-     }
-   else
-      if(BBUdirection < -1*mx && BBLdirection < -1*mx)    //BOTH in same direction
-        {
-         bb_score = -1;
-        }
-      else
-        {
-         bb_score = 0;
-        }
-//RSI FILTER
-   if(RSI.GetValue(0) > 50 && RSI.GetValue(0) <= 80)    //user input
-     {
-      rsi_score = 1;
-     }
-   else
-      if(RSI.GetValue(0) <= 50 && RSI.GetValue(0) >= 20)
-        {
-         rsi_score = -1;
-        }
-      else
-        {
-         rsi_score = 0;
-        }
-//MACD FILTER
-   if(MACD.GetValue(0,0) > MACD.GetValue(1,0) && MACD.GetValue(0,1) < MACD.GetValue(1,1))
-     {
-      macd_score = 1;
-     }
-   else
-      if(MACD.GetValue(0,0) < MACD.GetValue(1,0) && MACD.GetValue(0,1) > MACD.GetValue(1,1))
-        {
-         macd_score = -1;
-        }
-/////////////////HTF Scores///////////////
-#ifdef use_htf
-   int bb_h1_score = ((iClose(Symbol(),PERIOD_H1,0) < BBM_H1)) ? 1:-1; //closed below midline, buy. else, sell.
-   int rsi_h1_score, macd_h1_score;
-   if(RSI_H1.GetValue(0) >= 50 && RSI_H1.GetValue(0) <= 80)
-     {
-      rsi_h1_score = 1;
-     }
-   else
-      if(RSI_H1.GetValue(0) <= 50 && RSI_H1.GetValue(0) >= 20)
-        {
-         rsi_h1_score = -1;
-        }
-      else
-        {
-         rsi_h1_score = 0;
-        }
-   if(MACD_H1.GetValue(0,0) > MACD_H1.GetValue(1,0) && MACD_H1.GetValue(0,1) < MACD_H1.GetValue(1,1))
-     {
-      macd_h1_score = 1;
-     }
-   else
-      if(MACD_H1.GetValue(0,0) < MACD_H1.GetValue(1,0) && MACD_H1.GetValue(0,1) > MACD_H1.GetValue(1,1))
-        {
-         macd_h1_score = -1;
-        }
-   int hourly_score = bb_h1_score+rsi_h1_score+macd_h1_score;
+  //82.175 +0.386 * 2 //blue bottom (what we think the algorithm is)
+  //82.175 + 0.79 * 2 //blue top
+  //FIND THE HIGH POINT
+  //0.386 * (HIGHPOINT - blue border bottom)                     //blue border top, an unknown high point
 
-   if(InpBB_direction_filter == false)
+   ulong last_deal_ticket = GetLastDealTicket();                  //last deal ticket
+   ulong minutes_since_deal = GetMinutesSinceDeal(last_deal_ticket); //mins since last deal
+   ulong hold_mins = barsToMinutes(InpHoldBars);
+   ulong wait_mins = barsToMinutes(InpWaitBars);
+   if(PositionsTotal() == InpMaxPositions)
      {
-      bbh_1_score = 0;
+      if (minutes_since_deal > hold_mins) {
+        PrintFormat("Held too long, closing position");
+        Trade.PositionClose(Symbol(),last_deal_ticket);
+      }
      }
-#endif
+     if (PositionsTotal() == 0) {
+      if (minutes_since_deal < wait_mins) {
+          PrintFormat("Too soon to place another deal, returning.");
+          return;
+      }
+     } 
 
-   if(InpBB_direction_filter == false)
-     {
-      bb_score = 0;
-      bbl_score = 0;
-      bbu_score = 0;
-     }
-   if(InpRSI_filter == false)
-     {
-      rsi_score = 0;
-     }
-   if(InpMACD_filter == false)
-     {
-      macd_score = 0;
-     }
 
-///////////////////AVERAGE OUT SCORES///////////////
 
-   int daily_close_score = (iClose(Symbol(),PERIOD_D1,0) > iOpen(Symbol(),PERIOD_D1,0)) ? 1:-1;
-   int total_score = bb_score+rsi_score+macd_score+daily_close_score;
-   int total_sell_score = bbu_score+rsi_score+macd_score+daily_close_score;
-   int total_buy_score = bbl_score+rsi_score+macd_score+daily_close_score;
 ////////////////////FVBO SIGNALS////////////////
    if(close2 < BB.GetValue(2,2) && close1 > open1 && !fvbo_buy_flag)
      {
-      drawFVBO(1,clrPink);
+     drawFVBO(1,clrPink);
       fvbo_buy_flag = true;
       fvbo_sell_flag = false;
       prev_fvbo_buy_index = fvbo_buy_index;
@@ -306,11 +394,13 @@ void OnTick()
      }
      fvbo_buy_index++;
      prev_fvbo_buy_index++;
-   if(close2 > BB.GetValue(1,2) && close1 < open1 && !fvbo_sell_flag)
+   if(close2 > BB.GetValue(1,2) && close1 < open1 && !fvbo_sell_flag
+   )
      {
-      drawFVBO(1,clrPink);
+     drawFVBO(1,clrPink);
       fvbo_buy_flag = false;
       fvbo_sell_flag = true;
+      PrintFormat("FVBO SELL");
       prev_fvbo_sell_index = fvbo_sell_index;
       fvbo_sell_index = 0;
      PrintFormat("prev_fvbo_sell_index: %i\nfvbo_sell_index: %i",prev_fvbo_sell_index,fvbo_sell_index);
@@ -318,71 +408,42 @@ void OnTick()
      }
      fvbo_sell_index++;
      prev_fvbo_sell_index++;
-   if(close1 < hourlyLow)
-     {
-      // PrintFormat("NEW RANGE LOW (LOWEST CLOSE)");
-      prevLow = rangeLow;
-      drawNewLow(1,clrBlue);
-      lowTestCount = 0;
-     }
-   if(close1 > hourlyHigh)
-     {
-      // PrintFormat("NEW RANGE HIGH (HIGHEST CLOSE)");
-      prevHigh = rangeHigh;
-      drawNewHigh(1,clrRed);
-      highTestCount = 0;
-     }
-
-   if(high1 > hourlyHigh && close1 < hourlyHigh)
-     {
-      PrintFormat("HIGH TESTED");
-      highTestCount++;
-      drawHighTest(1,clrRed,highTestCount);
-     }
-   if(low1 < hourlyLow && close1 > hourlyLow)
-     {
-      PrintFormat("LOW TESTED");
-      lowTestCount++;
-      drawLowTest(1,clrBlue,lowTestCount);
-     }
 ///////////////////FVBO TRADE MANAGEMENT/////////////////////
-   if(fvbo_buy_flag)
+    double price = (ask + bid) / 2;
+    // Check if the price is in or near an aqua box (BUY_AOI)
+    // if (price >= aqua_top) // Assuming aqua_top is the upper limit of the aqua box
+    // {
+    //     canLong = true;
+    //     canShort = false;
+    // }
+
+   if(fvbo_buy_flag && canLong)
      {
       //check if search has expired
-      int lookback = 3;
+      int lookback = 5;
       int buy_signal_candle = iBarShift(Symbol(),Period(),buy_signal_time,false);
-
       if(buy_signal_candle > lookback)
-        {
-         fvbo_buy_flag = false;
-        }
+        { fvbo_buy_flag = false; }
       //PLACE BUY ORDER
       double sl =    NormalizeDouble(low1-sl_gap,   Digits());
       double price = high1;
       double tp =    price + tp_target;
-      // PrintFormat("Assessing BUY bias...total_score: %i\nmacd_score: %i\nbb_score: %i\nrsi_score: %i\ndaily_close_score: %i", total_score,macd_score,bb_score,rsi_score,daily_close_score);
-      // PrintFormat("and BBL score: %i",bbl_score);
 
-#ifdef use_htf
-      PrintFormat("and Hourly score: %i",hourly_score);
-#endif
       //RiskReward must be below midline and score must be positive
       if(price+rr < BBM && candleRange > pointsTarget)
         {
-         if(PositionsTotal() == 1)
-           {
-            fvbo_buy_flag = false;
-            return;
-           }
-          //  if (lowTestCount < 2) return; //don't place a trade if we haven't found support
-           if (prev_fvbo_buy_index > 20) return;
-         Trade.BuyStop(lots,price,Symbol(),sl,tp,ORDER_TIME_SPECIFIED,expiration);
+        Trade.BuyStop(lots,price,Symbol(),sl,tp,ORDER_TIME_SPECIFIED,expiration);
         }
      }
-
-   if(fvbo_sell_flag)
+    // Check if the price is in or near a dark blue box (SELL_AOI)
+    // if (price <= blue_bottom) // Assuming blue_bottom is the lower limit of the dark blue box
+    // {
+    //     canShort = true;
+    //     canLong = false;
+    // }
+   if(fvbo_sell_flag && canShort)
      {
-      int lookback = 3;
+      int lookback = 5;
       int sell_signal_candle = iBarShift(Symbol(),Period(),sell_signal_time,false);
       if(sell_signal_candle > lookback)
         {
@@ -392,12 +453,7 @@ void OnTick()
       double sl         = NormalizeDouble(high1+sl_gap,Digits());
       double price      = low1;
       double tp         = price - tp_target;
-      // PrintFormat("Assessing SELL bias...total_score: %i\nmacd_score: %i\nbb_score: %i\nrsi_score: %i\ndaily_close_score: %i", total_score,macd_score,bb_score,rsi_score,daily_close_score);         //RiskReward must be above midline && score must be negative
-      // PrintFormat("and BBU score: %i",bbu_score);
 
-#ifdef use_htf
-      PrintFormat("and Hourly score: %i",hourly_score);
-#endif
       if(price-rr > BBM && candleRange > pointsTarget)
         {
          if(PositionsTotal() == 1)
@@ -405,12 +461,9 @@ void OnTick()
             fvbo_sell_flag = false;
             return;
            }
-        //  if(highTestCount < 2) return; //don't place a trade if we haven't found resistance
-        if (prev_fvbo_sell_index > 20) return;
          Trade.SellStop(lots,price,Symbol(),sl,tp,ORDER_TIME_SPECIFIED,expiration);
         }
      }
-
   }
 
 
@@ -436,14 +489,7 @@ int getBBDirection(CIndicatorBollinger &Bollinger, int bufferIndex, int startBar
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void drawFVBO(int i, color c)
-  {
-   datetime setupTime = iTime(Symbol(), Period(), i);
-   ObjectCreate(0, "Setup" + setupTime, OBJ_TEXT, 0, setupTime, iHigh(Symbol(),Period(),i));
-   ObjectSetString(0,"Setup" + setupTime,OBJPROP_TEXT,"FVBO");
-   ObjectSetInteger(0, "Setup" + setupTime, OBJPROP_COLOR, c);
-   ObjectSetDouble(0,"Setup" + setupTime,OBJPROP_ANGLE,90.0);
-  }
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -635,4 +681,3 @@ ulong barsToMinutes(ulong bars)
    ulong minutes = PeriodSeconds(PERIOD_CURRENT) / 60;
    return minutes * bars;
   }
-//+------------------------------------------------------------------+

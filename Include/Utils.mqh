@@ -46,7 +46,8 @@ void ShowRangeLine( string name, ENUM_OBJECT type, double value, color rangeclr,
    ObjectSetInteger(0,name,OBJPROP_WIDTH,width);
 }
  bool WaitForHTF(string symbol, ENUM_TIMEFRAMES timeframe) {
-    for (int waitCount = 9; waitCount >= 0; waitCount--) {
+    for (int waitCount = 1000; waitCount >= 0; waitCount--) {
+      Print("Wait count: "+waitCount);
       datetime t = iTime(symbol, timeframe,0);
       int err = GetLastError();
       if (t > 0) return (true);

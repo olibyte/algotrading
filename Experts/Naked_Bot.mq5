@@ -110,7 +110,10 @@ CTrade Trade;
 CPositionInfo PositionInfo;
 COrderInfo OrderInfo;
 CIndicatorBollinger BB;
+CIndicatorBollinger BB_M30;
+CIndicatorBollinger BB_H1;
 CIndicatorRSI RSI;
+CIndicatorRSI RSI_M30;
 CIndicatorMACD MACD;
 //FVBO
 bool fvbo_buy_flag,fvbo_sell_flag;
@@ -135,7 +138,7 @@ int fvboLong = 0;
 int fvboShort = 0;
 double zz_high =0;
 double zz_low = 10000;
-bool zz_up, zz_down;
+bool dd_up, dd_down;
 double low_retrace_61_4;
 double low_retrace_21_0;
 double low_retrace_38_6;
@@ -153,6 +156,8 @@ datetime last_purple_signal, last_dark_red_signal, last_buy_aoi, last_sell_aoi;
 int last_purple_bar, last_dark_red_bar, last_aqua_top_bar, last_blue_bottom_bar, last_breakout_buy_bar, last_breakout_sell_bar;
 double last_purple_price, last_dark_red_price, last_aqua_top_price, last_blue_bottom_price, last_aqua_border_price, last_blue_border_price;
 
+
+
 //PLAYBOOK
 bool biasToolCompleted, bbRiverConfluence, breakoutAligned, deepTrendAligned, firstTestOfSDZone, SDZoneNotBunched;
 double prevRangeHigh = 0;
@@ -167,9 +172,11 @@ int OnInit()
 
 //ICUSTOM VFO
    BB.Init(Symbol(), Period(), InpBBPeriod, 0, InpBBDeviations, InpBBAppliedPrice);
-//  MACD.Init(Symbol(),Period(),8,21,5,PRICE_CLOSE);
-//  RSI.Init(Symbol(),Period(),5,PRICE_CLOSE);
-
+BB_M30.Init(Symbol(),PERIOD_M30,InpBBPeriod,0,InpBBDeviations,InpBBAppliedPrice);
+  MACD.Init(Symbol(),Period(),8,21,5,PRICE_CLOSE);
+  RSI.Init(Symbol(),Period(),5,PRICE_CLOSE);
+  RSI_M30.Init(Symbol(),PERIOD_M30,5,PRICE_CLOSE);
+  BB_H1.Init(Symbol(),PERIOD_H1,InpBBPeriod,0,InpBBDeviations,InpBBAppliedPrice);
    return(INIT_SUCCEEDED);
   }
 //+------------------------------------------------------------------+
@@ -214,54 +221,51 @@ void OnTick()
 //prevHigh = currHigh, currHigh = rangeHigh,
    rangeHighIndex =           iHighest(Symbol(),PERIOD_H4,MODE_HIGH,20,1);
    rangeLowIndex =            iLowest(Symbol(),PERIOD_H4,MODE_LOW,20,1);
-   if(rangeHigh != iHigh(Symbol(),PERIOD_H4,rangeHighIndex))
+   if(rangeHigh != iHigh(Symbol(),PERIOD_H4,rangeHighIndex)) //
      {
-      if(!zz_up)
+      if(!dd_up) //if we're not already in an uptrend
         {
-         //new range
-         // prevRangeHigh = currRangeHigh;
-         // currRangeHigh = rangeHigh;
          prevRangeHigh = rangeHigh;
-         zz_up = true;
-         zz_down = false;
+         dd_up = true;
+         dd_down = false;
         }
       rangeHigh = iHigh(Symbol(),PERIOD_H4,rangeHighIndex);
      }
 
    if(rangeLow != iLow(Symbol(),PERIOD_H4,rangeLowIndex))
      {
-      if(!zz_down)
+      if(!dd_down)
         {
          prevRangeLow = rangeLow;
-         zz_down = true;
-         zz_up = false;
+         dd_down = true;
+         dd_up = false;
         }
       rangeLow =                 iLow(Symbol(),PERIOD_H4,rangeLowIndex);
      }
 
 // Print statements to verify the values
-   Print("zz_up: "+zz_up);
-   Print("zz_down: "+zz_down);
+   Print("dd_up: "+dd_up);
+   Print("dd_down: "+dd_down);
    Print("prevRange High: ", prevRangeHigh);
    Print("prevRange Low :  ", prevRangeLow);
    double delta = rangeHigh - rangeLow;
-   if(zz_up)
+   if(dd_up)
      {
       low_retrace_61_4 = rangeLow + (delta * 0.614);
       low_retrace_21_0 = rangeLow + (delta * 0.21);
       low_retrace_38_6 = rangeLow + (delta * 0.386);
       low_retrace_79_0 = rangeLow + (delta * 0.79);
       DrawAOIBox("AOI_Supply", rangeHigh, high_retrace_38_6, iTime(Symbol(),PERIOD_H4,20), iTime(Symbol(),PERIOD_H4,0), BlueViolet); // A red AOI box for a supply zone
-      DrawAOIBox("AOI_Demand", rangeLow, low_retrace_79_0, iTime(Symbol(),PERIOD_H4,20), iTime(Symbol(),PERIOD_H4,0), OrangeRed); // A green AOI box for a demand zone
+      DrawAOIBox("AOI_Demand", rangeLow, low_retrace_38_6, iTime(Symbol(),PERIOD_H4,20), iTime(Symbol(),PERIOD_H4,0), OrangeRed); // A green AOI box for a demand zone
 
      }
-   if(zz_down)
+   if(dd_down)
      {
       high_retrace_61_4 = rangeHigh - (delta * 0.614);
       high_retrace_21_0 = rangeHigh - (delta * 0.21);
       high_retrace_38_6 = rangeHigh - (delta * 0.386);
       high_retrace_79_0 = rangeHigh - (delta * 0.79);
-      DrawAOIBox("AOI_Supply", rangeHigh, high_retrace_79_0, iTime(Symbol(),PERIOD_H4,20), iTime(Symbol(),PERIOD_H4,0), BlueViolet); // A red AOI box for a supply zone
+      DrawAOIBox("AOI_Supply", rangeHigh, high_retrace_38_6, iTime(Symbol(),PERIOD_H4,20), iTime(Symbol(),PERIOD_H4,0), BlueViolet); // A red AOI box for a supply zone
       DrawAOIBox("AOI_Demand", rangeLow, low_retrace_38_6, iTime(Symbol(),PERIOD_H4,20), iTime(Symbol(),PERIOD_H4,0), OrangeRed); // A green AOI box for a demand zone
 
      }
@@ -276,10 +280,6 @@ void OnTick()
    Print("high_Retrace 38_6:   ",high_retrace_38_6);
    Print("high_retrace 61_4:   ",high_retrace_61_4);
    Print("high_retrace 79_0:   ",high_retrace_79_0);
-
-// Print("Previous Range Low: ", prevRangeLow);
-
-// Print("Range Low: ", rangeLow);
 
    hourlyHighIndex =           iHighest(Symbol(),PERIOD_H1,MODE_HIGH,50,1);
    hourlyLowIndex =            iLowest(Symbol(),PERIOD_H1,MODE_LOW,50,1);
@@ -318,16 +318,6 @@ void OnTick()
    int sell_aoi_count = 0;
    for(int i = 0; i < object1_count; i++)
      {
-      string object_name = ObjectName(0,i,0);
-#ifdef tester
-      //filter out autrade objects:
-      string filter_string = "autotrade #";
-      if(StringFind(object_name,filter_string,0) > -1)
-        {
-         ObjectDelete(0,object_name);
-        }
-#endif
-      //identify ICT objects
       string matched_string1 = "_L"; //line start
       string matched_string2 = "_AOI";
       string matched_string3 = "_R"; //line end
@@ -339,8 +329,20 @@ void OnTick()
       string object_end_time;
       datetime object_time;
       datetime object_end_datetime;
+
+      string object_name = ObjectName(0,i,0);
+#ifdef tester
+      //filter out autrade objects:
+      string filter_string = "autotrade #";
+      if(StringFind(object_name,filter_string,0) > -1)
+        {
+         ObjectDelete(0,object_name);
+        }
+#endif
+      //identify ICT objects
       if((StringFind(object_name,matched_string1,0) > -1) || (StringFind(object_name,matched_string2,0) > -1) || (StringFind(object_name,matched_string3,0) > -1) || (StringFind(object_name,matched_string4,0) > -1) || (StringFind(object_name,matched_string5,0) > -1) || (StringFind(object_name,matched_string6,0) > -1))
         {
+         Print("Finding objects by color");
          object_color = ObjectGetInteger(0,object_name,OBJPROP_COLOR);
          object_price = NormalizeDouble(ObjectGetDouble(0,object_name,OBJPROP_PRICE,0),Digits());
          object_time = (datetime)ObjectGetInteger(0,object_name,OBJPROP_TIME);
@@ -399,6 +401,7 @@ void OnTick()
             last_aqua_border_price = object_price;
            };
         };
+
      };
 // breakout signals based on divergence?
 //If vfo is rising and zz is falling, and vice versa.
@@ -416,8 +419,6 @@ void OnTick()
       last_buy_aoi = TimeCurrent();
 
       // canShort = false; canLong = true;
-      // bullishPattern = 0; bearishPattern = 0;
-      // fvboLong = 0; fvboShort = 0;
      };
    if(sell_aoi_total != sell_aoi_count)
      {
@@ -454,32 +455,18 @@ void OnTick()
         }
      };
 //FILTER SIGNALS
+   Print("Filtering signals...");
    if(filter_total != filter_count)
      {
       Print("Signal filtered. Filter total was "+filter_total+" and is now "+filter_count);
       filter_total = filter_count;
      };
 
-// Print("Last purple signal:   "+last_purple_signal);
-// Print("Last dark red signal: "+last_dark_red_signal);
-// Print("Last_dark")
-// Print("Last blue_bottom:  "+last_buy_aoi+ "  "+blue_bottom);
-// Print("Last aqua_top: "+last_sell_aoi+ " "+aqua_top);
    last_blue_bottom_bar = iBarShift(Symbol(),Period(),last_sell_aoi);
    last_aqua_top_bar = iBarShift(Symbol(),Period(),last_buy_aoi);
    last_breakout_buy_bar = iBarShift(Symbol(),Period(),last_dark_red_signal); //needs fixing
    last_breakout_sell_bar = iBarShift(Symbol(),Period(),last_purple_signal); //needs fixing
 
-
-   int local_high_bar = iHighest(Symbol(),PERIOD_H4,MODE_HIGH,12);
-//if local_high is greater than zz_high, it's a new zigzag point.
-   double local_high = NormalizeDouble(iHigh(Symbol(),PERIOD_H4,local_high_bar),Digits());
-   int local_low_bar = iHighest(Symbol(),PERIOD_H4,MODE_LOW,12);
-//if local_high is greater than zz_high, it's a new zigzag point.
-   double local_low = NormalizeDouble(iHigh(Symbol(),PERIOD_H4,local_low_bar),Digits());
-//if local_high - local_low > x, it's a zigzag point
-   zz_high = MathMax(local_high,zz_high);
-   zz_low = MathMin(local_low,zz_low);
 
    if(last_blue_bottom_bar > last_aqua_top_bar)
      {
@@ -499,12 +486,6 @@ void OnTick()
    Print("Last aqua_border_price: "+ last_aqua_border_price); //demand zone
    Print("Last breakout_buy_bar: "+ last_breakout_buy_bar);
    Print("Last breakout_sell_bar: "+ last_breakout_sell_bar);
-// Print("local high time: "+ iTime(Symbol(),PERIOD_H4,local_high_bar));
-// Print("zz high:    "+ zz_high);
-// Print("local high: "+local_high);
-// Print("local low time: "+ iTime(Symbol(),PERIOD_H4,local_low_bar));
-// Print("zz low:    "+ zz_low);
-// Print("local low: "+local_low);
    ShowRange(rangeHigh,rangeLow,BlueViolet,OrangeRed,2);
 
 //if rangeLowIndex < rangeHighIndex, zz going up
@@ -514,87 +495,43 @@ void OnTick()
 // Print("HourlyHighIndex"+hourlyHighIndex);
 // Print("HourlyLowIndex"+hourlyLowIndex);
 
+//if (high_retrace_38_6 < low_retrace_38_6) {
+//    Print("High retrace < Low retace. Returning.");
+//  return;
+//}
 //improved results!
-   if(last_aqua_top_price >= last_blue_bottom_price)
-     {
-      Print("S&D bunched together. Returning.");
-      return;
-     }
-
-// Print("blue_aoi_bottom: "+blue_bottom);
-// Print("blue_border_bottom: "+blue_border);
-// Print("aqua_aoi_top:    "+aqua_top);
-// Print("aqua_border_top: "+aqua_border);
-// if (isBearishEuphoria(1)) { drawBearishEuphoria(1); bearishPattern++;}
-// if (isBullishEuphoria(1)) { bullishPattern++; drawBullishEuphoria(1);}
-   patternMomentum = bullishPattern-bearishPattern;
-   int purpleMomentum = purple_total - dark_red_total;
-   int fvboMomentum = fvboLong - fvboShort;
-// Print("Pattern momentum: "+patternMomentum);
-
-// int blue_border_top_index = iHighest(Symbol(),Period(),MODE_HIGH,1000,2);
-// double blue_border_top = iClose(Symbol(),Period(),blue_border_top_index);
-// Print("blue_border_top? "+blue_border_top);
-
-
-
-//82.175 = low = blue border bottom
-//83.063572 = //blue bottom
-
-//REVERSE ENGINEERING FOR A 38.2 FIB LEVEL
-//FIB_LEVEL = 38.2
-//83.063572−82.175=0.382×(High Point−82.175)
-//0.888572=0.382×(High Point−82.175)
-//High Point-82.175= (0.888572/0.382 )
-//High Point=82.175+ (0.888572/0.382 )
-//High Point=82.175+2.326
-//  High Point=84.501 //OUR BLUE BORDER TOP LEVEL
-
-//REVERSE ENGINEERING FOR A 79.0 FIB LEVEL
-//FIB_LEVEL = 79
-//83.063572−82.175=0.79×(High Point−82.175)
-//0.888572=0.79×(High Point−82.175)
-//  82.175 = 0.79
-//High Point-82.175= (0.888572/0.382 )
-//High Point=82.175+ (0.888572/0.382 )
-//High Point=82.175+2.326
-//  High Point=84.501 //OUR BLUE BORDER TOP LEVEL
-
-
-
-//82.175 +0.386 * 2 //blue bottom (what we think the algorithm is)
-//82.175 + 0.79 * 2 //blue top
-//FIND THE HIGH POINT
-//0.386 * (HIGHPOINT - blue border bottom)                     //blue border top, an unknown high point
-
+//  if(last_aqua_top_price >= last_blue_bottom_price)
+//  {
+// Print("S&D bunched together. Returning.");
+// return;
+//  }
    ulong last_deal_ticket = GetLastDealTicket();                  //last deal ticket
    ulong minutes_since_deal = GetMinutesSinceDeal(last_deal_ticket); //mins since last deal
    ulong hold_mins = barsToMinutes(InpHoldBars);
    ulong wait_mins = barsToMinutes(InpWaitBars);
-   if(PositionsTotal() == InpMaxPositions)
-     {
-      if(minutes_since_deal > hold_mins)
-        {
-         PrintFormat("Held too long, closing position");
-         Trade.PositionClose(Symbol(),last_deal_ticket);
-        }
-     }
-   if(PositionsTotal() == 0)
-     {
-      if(minutes_since_deal < wait_mins)
-        {
-         PrintFormat("Too soon to place another deal, returning.");
-         return;
-        }
-     }
+ if(PositionsTotal() == InpMaxPositions)
+   {
+    if(minutes_since_deal > hold_mins)
+      {
+       PrintFormat("Held too long, closing position");
+       Trade.PositionClose(Symbol(),last_deal_ticket);
+      }
+   }
+ if(PositionsTotal() == 0)
+   {
+    if(minutes_since_deal < wait_mins)
+      {
+       PrintFormat("Too soon to place another deal, returning.");
+       return;
+      }
+   }
 
-
+   Print("Finding FVBO Signals...");
 ////////////////////FVBO SIGNALS////////////////
-//BB.GetValue(2,2) is LOWER
    if(close2 < BB.GetValue(2,2) && close1 > open1 && !fvbo_buy_flag)
      {
       fvboLong++;
-      //  drawFVBO(1,clrPink);
+      drawFVBO(1,clrPink);
       fvbo_buy_flag = true;
       fvbo_sell_flag = false;
       prev_fvbo_buy_index = fvbo_buy_index;
@@ -604,11 +541,10 @@ void OnTick()
      }
    fvbo_buy_index++;
    prev_fvbo_buy_index++;
-//bb.getValue(1,2) is UPPER
    if(close2 > BB.GetValue(1,2) && close1 < open1 && !fvbo_sell_flag)
      {
       fvboShort++;
-      //  drawFVBO(1,clrPink);
+      drawFVBO(1,clrPink);
       fvbo_buy_flag = false;
       fvbo_sell_flag = true;
       PrintFormat("FVBO SELL");
@@ -621,7 +557,52 @@ void OnTick()
    prev_fvbo_sell_index++;
 ///////////////////FVBO TRADE MANAGEMENT/////////////////////
    double price = (ask + bid) / 2;
-  //vbo 2.0 hammer in an uptrend
+//vbo 2.0 hammer in an uptrend
+   fvbo_buy_flag = false;
+   fvbo_sell_flag = false;
+   canLong = false;
+   canShort = false;
+///////////////////VBO TRADE MANAGEMENT///////////
+//if DD aligned and S+D not bunched, trade
+//if closed outside BB && dd up && s 386 is above d386
+//FILTERS
+if (high_retrace_61_4 < low_retrace_61_4){ Print("Retracement levels bunched. Returning."); return;}
+
+   if(
+   dd_up &&
+   close1 < BB.GetValue(0,0) && 
+   RSI.GetValue(0) <= 30 &&
+   close1 < BB_M30.GetValue(0,0) &&
+   RSI_M30.GetValue(0) < 50 &&
+   close1 < BB_H1.GetValue(2,0) &&
+   MACD.GetValue(0,0) < MACD.GetValue(1,0)
+   )
+     {
+      //PLACE BUY ORDER
+      Print("Conditions met for BUY");
+      sl = low1-PointsToDouble(100,Symbol());
+      price = high1;
+      tp = high1+PointsToDouble(200,Symbol());
+      Trade.BuyStop(lots,price,Symbol(),sl,tp,ORDER_TIME_SPECIFIED,expiration);
+     }
+   if(
+   dd_down && 
+   close1 > BB.GetValue(0,0) && 
+   RSI.GetValue(0) >= 70 &&
+   close1 > BB_M30.GetValue(0,0) &&
+   RSI_M30.GetValue(0) > 50 &&
+   close1 > BB_H1.GetValue(1,0) &&
+   MACD.GetValue(0,0) > MACD.GetValue(1,0)
+   )
+     {
+      //PLACE SELL ORDER
+      Print("Conditions met for SELL");
+      sl = high1+PointsToDouble(100,Symbol());
+      price = low1;
+      tp = low1-PointsToDouble(100,Symbol());
+      Trade.SellStop(lots,price,Symbol(),sl,tp,ORDER_TIME_SPECIFIED,expiration);
+     }
+
    if(fvbo_buy_flag)
      {
       int buy_signal_candle = iBarShift(Symbol(),Period(),buy_signal_time,false);
@@ -805,12 +786,12 @@ bool getFirstTestOfSupplyAndDemandZone()
   {
    return false;
   }
-  //are we experience higher highs, and higher lows?
-  //or lower highs and lower lows?
+//are we experience higher highs, and higher lows?
+//or lower highs and lower lows?
 int getDominantDirection()
-{
-
-}
+  {
+   return -1;
+  }
 
 
 

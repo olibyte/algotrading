@@ -896,4 +896,3 @@ string DayOfWeek(const datetime time)
   double getBbGradient() {}
   int peakFinder(){}
   */
-

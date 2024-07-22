@@ -156,8 +156,6 @@ datetime last_purple_signal, last_dark_red_signal, last_buy_aoi, last_sell_aoi;
 int last_purple_bar, last_dark_red_bar, last_aqua_top_bar, last_blue_bottom_bar, last_breakout_buy_bar, last_breakout_sell_bar;
 double last_purple_price, last_dark_red_price, last_aqua_top_price, last_blue_bottom_price, last_aqua_border_price, last_blue_border_price;
 
-
-
 //PLAYBOOK
 bool biasToolCompleted, bbRiverConfluence, breakoutAligned, deepTrendAligned, firstTestOfSDZone, SDZoneNotBunched;
 double prevRangeHigh = 0;
@@ -172,11 +170,11 @@ int OnInit()
 
 //ICUSTOM VFO
    BB.Init(Symbol(), Period(), InpBBPeriod, 0, InpBBDeviations, InpBBAppliedPrice);
-BB_M30.Init(Symbol(),PERIOD_M30,InpBBPeriod,0,InpBBDeviations,InpBBAppliedPrice);
+//BB_M30.Init(Symbol(),PERIOD_M30,InpBBPeriod,0,InpBBDeviations,InpBBAppliedPrice);
   MACD.Init(Symbol(),Period(),8,21,5,PRICE_CLOSE);
   RSI.Init(Symbol(),Period(),5,PRICE_CLOSE);
-  RSI_M30.Init(Symbol(),PERIOD_M30,5,PRICE_CLOSE);
-  BB_H1.Init(Symbol(),PERIOD_H1,InpBBPeriod,0,InpBBDeviations,InpBBAppliedPrice);
+//  RSI_M30.Init(Symbol(),PERIOD_M30,5,PRICE_CLOSE);
+//  BB_H1.Init(Symbol(),PERIOD_H1,InpBBPeriod,0,InpBBDeviations,InpBBAppliedPrice);
    return(INIT_SUCCEEDED);
   }
 //+------------------------------------------------------------------+
@@ -570,11 +568,11 @@ if (high_retrace_61_4 < low_retrace_61_4){ Print("Retracement levels bunched. Re
 
    if(
    dd_up &&
-   close1 < BB.GetValue(0,0) && 
+   close1 < BB.GetValue(0,0) && //and bullish
    RSI.GetValue(0) <= 30 &&
-   close1 < BB_M30.GetValue(0,0) &&
-   RSI_M30.GetValue(0) < 50 &&
-   close1 < BB_H1.GetValue(2,0) &&
+//   close1 < BB_M30.GetValue(0,0) &&
+//   RSI_M30.GetValue(0) < 50 &&
+   //close1 < BB_H1.GetValue(2,0) &&
    MACD.GetValue(0,0) < MACD.GetValue(1,0)
    )
      {
@@ -589,9 +587,9 @@ if (high_retrace_61_4 < low_retrace_61_4){ Print("Retracement levels bunched. Re
    dd_down && 
    close1 > BB.GetValue(0,0) && 
    RSI.GetValue(0) >= 70 &&
-   close1 > BB_M30.GetValue(0,0) &&
-   RSI_M30.GetValue(0) > 50 &&
-   close1 > BB_H1.GetValue(1,0) &&
+//   close1 > BB_M30.GetValue(0,0) &&
+//   RSI_M30.GetValue(0) > 50 &&
+//   close1 > BB_H1.GetValue(1,0) &&
    MACD.GetValue(0,0) > MACD.GetValue(1,0)
    )
      {
@@ -625,7 +623,6 @@ if (high_retrace_61_4 < low_retrace_61_4){ Print("Retracement levels bunched. Re
          return;
         }
       //if ask is too high, don't buy.
-      // if (ask )
       Trade.BuyStop(lots,price,Symbol(),sl,tp,ORDER_TIME_SPECIFIED,expiration);
      }
 
